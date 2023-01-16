@@ -661,9 +661,9 @@ winT <- c(rep(4,times = length(age)/3),
           rep(-40,times = length(age)/3),
           rep(4,times = length(age)/3))
 
-sumT <- c(rep(sth+5,times = length(age)/3),
+sumT <- c(rep(stl,times = length(age)/3),
           rep(sth,times = length(age)/3),
-          rep(stl,times = length(age)/3))
+          rep(sth+5,times = length(age)/3))
 
 warming <- data.frame(age  = age,
                       temperature = sumT,
