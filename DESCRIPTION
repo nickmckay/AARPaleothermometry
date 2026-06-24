@@ -12,6 +12,8 @@ Description: Simulates amino acid racemization (D/L ratios) in lake sediment
     Developed as part of NSF project 2317409 "Testing amino acid paleothermometry
     in radiocarbon-dated lake sediment."
 License: MIT + file LICENSE
+URL: https://nickmckay.github.io/AARP, https://github.com/nickmckay/AARP
+BugReports: https://github.com/nickmckay/AARP/issues
 Encoding: UTF-8
 Depends: R (>= 4.1.0)
 Roxygen: list(markdown = TRUE)
@@ -24,5 +26,6 @@ Imports:
     rlang
 Suggests:
     knitr,
-    rmarkdown
+    rmarkdown,
+    pkgdown
 VignetteBuilder: knitr

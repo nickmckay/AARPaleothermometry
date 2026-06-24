@@ -7,3 +7,6 @@
 ^powerLaw\.R$
 ^depth_series\.R$
 ^bayesian_inversion\.R$
+^_pkgdown\.yml$
+^docs$
+^\.github$

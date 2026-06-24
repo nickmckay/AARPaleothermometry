@@ -1,0 +1,93 @@
+url: https://nickmckay.github.io/AARP
+
+template:
+  bootstrap: 5
+  bootswatch: flatly
+
+home:
+  title: "AARP — Amino Acid Racemization Paleothermometry"
+  description: >
+    Forward model and Bayesian inversion for inferring Holocene paleotemperatures
+    from amino acid D/L ratios in lake sediment.
+
+repo:
+  url:
+    home: https://github.com/nickmckay/AARP
+    source: https://github.com/nickmckay/AARP/blob/main/
+    issue: https://github.com/nickmckay/AARP/issues
+    user: https://github.com/
+
+navbar:
+  structure:
+    left:  [intro, articles, reference]
+    right: [search, github]
+  components:
+    articles:
+      text: Articles
+      menu:
+        - text: "Forward model basics"
+          href: articles/forward-model-basics.html
+        - text: "Depth-series simulation"
+          href: articles/depth-series.html
+        - text: "Stage 1 — Bayesian kinetics estimation"
+          href: articles/kinetics-fitting.html
+        - text: "Stage 2 — Holocene temperature reconstruction"
+          href: articles/temperature-reconstruction.html
+
+reference:
+  - title: "Forward model"
+    desc: >
+      Core Arrhenius/power-law racemization model and thermal integration
+      utilities.
+    contents:
+      - arrhenius
+      - dRacPL
+      - racemize
+      - racemizeSample
+      - racemize_one_depth
+      - racemize_depth_series
+      - predict_heating_DL
+      - get_temp_at_time
+      - diffusion_attenuation
+      - dampSedTemps
+
+  - title: "Age–depth models"
+    desc: >
+      Construct and query age–depth relationships for sediment cores.
+    contents:
+      - make_age_model
+      - rate_to_age_model
+
+  - title: "Simulation"
+    desc: >
+      Generate synthetic heating-experiment and downcore D/L datasets for
+      testing and vignette demonstrations.
+    contents:
+      - sim_heating_data
+      - sim_downcore_data
+      - default_AAR_params
+
+  - title: "Bayesian inference"
+    desc: >
+      Log-likelihood, log-prior, and log-posterior functions for the two-stage
+      MCMC framework, plus the MCMC sampler itself.
+    contents:
+      - log_lik_heating
+      - log_lik_downcore
+      - log_lik_temperature
+      - log_prior_kinetics
+      - log_prior_temperature
+      - log_posterior_kinetics
+      - log_posterior_temperature
+      - run_mcmc
+
+  - title: "Visualisation & diagnostics"
+    desc: >
+      Trace plots, posterior density plots, temperature reconstructions, and
+      posterior predictive checks.
+    contents:
+      - plot_mcmc_chains
+      - plot_posterior_kinetics
+      - plot_temperature_reconstruction
+      - posterior_predictive_DL
+      - plotInputs
