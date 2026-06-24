@@ -89,6 +89,49 @@ ggplot(cal_data, aes(x = DL_obs, y = depth_cm)) +
   theme_bw()
 ```
 
+## Prior specification
+
+The log-posterior combines two likelihoods (heating experiments and the
+calibration core) with a **prior** on the four sampled parameters. Inspecting
+the priors before running the sampler confirms they are broad relative to the
+data so the observations drive the posterior.
+
+| Parameter | Prior | Centre | SD |
+|-----------|-------|--------|----|
+| $\log(A_e)$ | Normal | 42.12 | 2 |
+| $E_a$ (kcal/mol) | Normal | 31.5 | 5 |
+| $x$ | Normal | 3 | 0.5 |
+| $\log(\sigma)$ | Normal | $\log(0.02)$ | 1 |
+
+Centres are drawn from published Ile-Ile estimates (Kaufman 2000). Standard
+deviations are wide enough to allow the data to move the posterior substantially,
+while still ruling out physically implausible values.
+
+```{r prior_kin, fig.height=5}
+prior_pars <- list(
+  log_Ae    = c(mean = 42.12,     sd = 2),
+  Ea        = c(mean = 31.5,      sd = 5),
+  x         = c(mean = 3,         sd = 0.5),
+  log_sigma = c(mean = log(0.02), sd = 1)
+)
+
+prior_df <- do.call(rbind, lapply(names(prior_pars), function(nm) {
+  p <- prior_pars[[nm]]
+  v <- seq(p["mean"] - 3.5 * p["sd"], p["mean"] + 3.5 * p["sd"],
+           length.out = 400)
+  data.frame(parameter = nm, value = v,
+             density   = dnorm(v, p["mean"], p["sd"]))
+}))
+
+ggplot(prior_df, aes(x = value, y = density)) +
+  geom_area(fill = "darkorange", alpha = 0.3) +
+  geom_line(colour = "darkorange", linewidth = 0.9) +
+  facet_wrap(~parameter, scales = "free", ncol = 2) +
+  labs(x = "Value", y = "Prior density",
+       title = "Stage 1 priors: kinetic parameters") +
+  theme_bw()
+```
+
 ## Run Stage 1 MCMC
 
 We run a random-walk Metropolis-Hastings chain. Proposal standard deviations
@@ -101,10 +144,10 @@ init_kin <- c(log_Ae    = 42.12,
               x         = 3.0,
               log_sigma = log(0.01))
 
-prop_kin <- c(log_Ae    = 0.05,
-              Ea        = 0.3,
-              x         = 0.05,
-              log_sigma = 0.1)
+prop_kin <- c(log_Ae    = 0.005,
+              Ea        = 0.05,
+              x         = 0.003,
+              log_sigma = 0.008) / 2
 
 mcmc_kin <- run_mcmc(log_posterior_kinetics,
                      init        = init_kin,
@@ -130,7 +173,9 @@ plot_mcmc_chains(mcmc_kin, burnin = 1000)
 ## Posterior distributions
 
 Red dashed lines show the true parameter values used to generate the data.
-Posteriors should be centred near those lines.
+Orange curves show the prior density. The posterior (blue fill) should be much
+narrower than the prior, confirming that the data are informative, and centred
+near the true values.
 
 ```{r posteriors}
 true_kin <- c(log_Ae    = 42.12,
@@ -138,7 +183,9 @@ true_kin <- c(log_Ae    = 42.12,
               x         = 3.0,
               log_sigma = log(0.01))
 
-plot_posterior_kinetics(mcmc_kin, true_params = true_kin, burnin = 1000)
+plot_posterior_kinetics(mcmc_kin, true_params = true_kin, burnin = 1000) +
+  geom_line(data = prior_df, aes(x = value, y = density),
+            colour = "darkorange", linewidth = 0.9, inherit.aes = FALSE)
 ```
 
 ## Posterior predictive check

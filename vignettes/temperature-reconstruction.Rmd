@@ -51,7 +51,7 @@ cal_data <- sim_downcore_data(am_cal,
                               seed           = 2)
 
 init_kin <- c(log_Ae = 42.12, Ea = 31.5, x = 3.0, log_sigma = log(0.01))
-prop_kin <- c(log_Ae = 0.05,  Ea = 0.3,  x = 0.05, log_sigma = 0.1)
+prop_kin <- c(log_Ae = 0.05,  Ea = 0.3,  x = 0.05, log_sigma = 0.1) / 5
 
 mcmc_kin <- run_mcmc(log_posterior_kinetics,
                      init              = init_kin,
@@ -109,21 +109,97 @@ ggplot(target_data, aes(x = DL_obs, y = depth_cm)) +
   theme_bw()
 ```
 
+## Prior specification for Stage 2
+
+```{r knot_setup}
+knot_ages <- c(0, 2, 4, 6, 8, 10)  # ka BP
+```
+
+Stage 2 has three prior components for the temperature history parameters:
+
+**Marginal temperature prior** — each knot temperature receives a weakly
+informative Normal(5, 3) prior, centred near present-day Arctic/sub-Arctic
+mean annual temperatures. The ±3σ range spans roughly −4°C to 14°C, which
+easily encompasses Holocene variability without constraining the inference
+to any particular trend.
+
+**Smoothness prior** — adjacent knot differences receive a Normal(0, 2)
+penalty on the log scale. This encodes the physical expectation of gradual
+Holocene temperature change: 2-ka step sizes larger than ~4°C (2σ) are
+strongly penalised but not impossible.
+
+**Noise prior** — log(σ) receives Normal(log(0.02), 1), the same as Stage 1,
+centred near HPLC analytical precision.
+
+```{r prior_stage2, fig.height=3.5}
+# Marginal temperature prior and smoothness prior
+prior_T_df <- rbind(
+  data.frame(
+    component     = "Knot temperature:  N(5, 3)",
+    value         = seq(-4, 14, length.out = 300),
+    density       = dnorm(seq(-4, 14, length.out = 300), 5, 3)
+  ),
+  data.frame(
+    component     = "Step size (2-ka):  N(0, 2)",
+    value         = seq(-7, 7, length.out = 300),
+    density       = dnorm(seq(-7, 7, length.out = 300), 0, 2)
+  )
+)
+
+ggplot(prior_T_df, aes(x = value, y = density)) +
+  geom_area(fill = "darkorange", alpha = 0.3) +
+  geom_line(colour = "darkorange", linewidth = 0.9) +
+  facet_wrap(~component, scales = "free", ncol = 2) +
+  labs(x = "Value (°C)", y = "Prior density",
+       title = "Stage 2 priors: temperature history") +
+  theme_bw()
+```
+
+Drawing 200 independent trajectories from the marginal knot prior gives a
+prior predictive envelope — the range of temperature histories considered
+plausible before the D/L data are observed:
+
+```{r prior_predictive_T, fig.height=4}
+set.seed(7)
+n_prior     <- 200
+prior_T_mat <- matrix(rnorm(n_prior * length(knot_ages), mean = 5, sd = 3),
+                      nrow = n_prior)
+
+summ_prior <- do.call(rbind, lapply(seq_along(knot_ages), function(j) {
+  data.frame(
+    age_ka = knot_ages[j],
+    lo95   = quantile(prior_T_mat[, j], 0.025),
+    hi95   = quantile(prior_T_mat[, j], 0.975),
+    lo50   = quantile(prior_T_mat[, j], 0.25),
+    hi50   = quantile(prior_T_mat[, j], 0.75)
+  )
+}))
+
+ggplot(summ_prior, aes(x = age_ka)) +
+  geom_ribbon(aes(ymin = lo95, ymax = hi95),
+              fill = "darkorange", alpha = 0.2) +
+  geom_ribbon(aes(ymin = lo50, ymax = hi50),
+              fill = "darkorange", alpha = 0.4) +
+  scale_x_reverse() +
+  labs(x = "Age (ka BP)", y = "Temperature (°C)",
+       title = "Prior predictive envelope: temperature history",
+       subtitle = "Inner band: 50% prior interval; outer band: 95% prior interval") +
+  theme_bw()
+```
+
 ## Run Stage 2 MCMC
 
 The temperature parameterisation uses 6 control knots. Initialise near a
 plausible flat temperature and use a moderately diffuse proposal:
 
 ```{r stage2, cache=TRUE}
-knot_ages  <- c(0, 2, 4, 6, 8, 10)  # ka BP
-
 init_T <- c(T_0ka  = 6, T_2ka  = 6, T_4ka  = 6,
             T_6ka  = 6, T_8ka  = 6, T_10ka = 6,
             log_sigma = log(0.015))
 
 prop_T <- c(T_0ka  = 0.3, T_2ka  = 0.3, T_4ka  = 0.3,
             T_6ka  = 0.3, T_8ka  = 0.3, T_10ka = 0.3,
-            log_sigma = 0.1)
+            log_sigma = 0.1) * 2
 
 mcmc_T <- run_mcmc(log_posterior_temperature,
                    init              = init_T,
@@ -148,7 +224,10 @@ plot_mcmc_chains(mcmc_T, burnin = 1000)
 ## Temperature reconstruction
 
 The reconstruction shows the posterior median (line), the 95% credible
-interval (ribbon), and the true temperature history (red dashed line):
+interval (blue ribbon), the true temperature history (red dashed line), and
+the 95% prior predictive interval (orange ribbon). The posterior should be
+substantially narrower than the prior, demonstrating that the D/L data are
+informative about temperature:
 
 ```{r reconstruction, fig.height=4.5}
 true_T_df <- data.frame(age_ka = knot_ages,
@@ -157,12 +236,18 @@ true_T_df <- data.frame(age_ka = knot_ages,
 plot_temperature_reconstruction(mcmc_T,
                                 knot_ages_ka   = knot_ages,
                                 true_T_history = true_T_df,
-                                burnin         = 1000)
+                                burnin         = 1000) +
+  geom_ribbon(data = summ_prior,
+              aes(x = age_ka, ymin = lo95, ymax = hi95),
+              fill = "darkorange", alpha = 0.15, inherit.aes = FALSE) +
+  labs(subtitle = "Orange: 95% prior; blue: 95% posterior")
 ```
 
 The true cooling trend (red dashed line) should fall within the credible
 envelope. Uncertainty is largest at the oldest end of the record, where the
-cumulative integration of noisy D/L data limits resolution.
+cumulative integration of noisy D/L data limits resolution. The contrast
+between the wide orange prior and the narrow blue posterior quantifies how
+much information the D/L profile contributes.
 
 ## Posterior predictive check
 
@@ -216,21 +301,10 @@ ggplot(summ, aes(x = median, y = depth_cm)) +
 
 Several factors govern the width of the credible interval:
 
-- **Number of samples**: more observations reduce uncertainty. Here we used 20
-  samples; real cores often have 15 to 30 dateable horizons.
+- **Number of samples**: more observations reduce uncertainty. Here we used 20 samples.
 
-- **Observation noise** (`sigma`): analytical precision in the D/L measurement.
-  Modern HPLC achieves $\sigma \approx 0.01$ to $0.02$, consistent with the value
-  used here.
+- **Observation noise** (`sigma`): analytical precision in the D/L measurement. Here we used $\sigma \approx 0.01$ to $0.02$, is that realistic?
 
-- **Kinetics uncertainty**: we fixed kinetics at their Stage 1 posterior median.
-  Propagating the full Stage 1 posterior (i.e., drawing both kinetics and
-  temperature jointly) would widen the credible interval further. This remains
-  an area for future work.
+- **Kinetics uncertainty**: I fixed kinetics at their Stage 1 posterior median. Propagating the full Stage 1 posterior (i.e., drawing both kinetics and temperature jointly) would widen the credible interval further. We should do this, and turn this into a proper Bayesian Hierarchical Model.
 
-- **Holocene conundrum context**: proxy reconstructions typically show ~0.7°C
-  of Holocene cooling. A 3°C change (as used here) is easily detectable; the
-  0.7°C signal may require very precise D/L measurements and well-constrained
-  kinetics, which is why the project invests in both lab heating experiments
-  and multi-core calibration.
 ```

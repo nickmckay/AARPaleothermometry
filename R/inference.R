@@ -296,11 +296,23 @@ run_mcmc <- function(log_post_fn, init, n_iter, proposal_sd, ...) {
 #' @importFrom rlang .data
 #' @export
 plot_mcmc_chains <- function(mcmc_out, burnin = 1000) {
-  df            <- as.data.frame(mcmc_out$samples)
-  df$iteration  <- seq_len(nrow(df))
-  long          <- tidyr::pivot_longer(df, -"iteration",
-                                       names_to = "parameter",
-                                       values_to = "value")
+  df           <- as.data.frame(mcmc_out$samples)
+  df$iteration <- seq_len(nrow(df))
+  param_long   <- tidyr::pivot_longer(df, -"iteration",
+                                      names_to  = "parameter",
+                                      values_to = "value")
+
+  lp_long <- data.frame(
+    iteration = seq_along(mcmc_out$log_post),
+    parameter = "log(objective)",
+    value     = mcmc_out$log_post
+  )
+
+  long <- rbind(lp_long, param_long)
+  long$parameter <- factor(long$parameter,
+                           levels = c("log(objective)",
+                                      setdiff(unique(long$parameter),
+                                              "log(objective)")))
 
   ggplot2::ggplot(long, ggplot2::aes(x = .data$iteration, y = .data$value)) +
     ggplot2::annotate("rect", xmin = 0, xmax = burnin,

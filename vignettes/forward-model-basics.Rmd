@@ -109,6 +109,8 @@ noticeably more racemization than the low-seasonality scenario (sum=11/win=8),
 even though the mean annual temperature is identical. This is why the model
 treats summer and winter half-years separately.
 
+Of course if we're looking at lake sediments, it's hard to get this much seasonality the water, and especially the accumulating sediment damp the variability and push everything towards mean annual temperature. 
+
 ## Holocene temperature trend sensitivity
 
 How well can D/L distinguish between different Holocene temperature histories?
