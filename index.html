@@ -57,8 +57,203 @@
 </nav><div class="container template-home">
 <div class="row">
   <main id="main" class="col-md-9"><div class="section level1">
-<div class="page-header"><h1 id="aarp">AARP<a class="anchor" aria-label="anchor" href="#aarp"></a>
+<div class="page-header"><h1 id="aarp-">AARP <img src="reference/figures/logo.png" align="right" height="139" alt=""><a class="anchor" aria-label="anchor" href="#aarp-"></a>
 </h1></div>
+<!-- badges: start -->
+
+<p><strong>Amino Acid Racemization Paleothermometry</strong> — a forward model and Bayesian inversion framework for inferring Holocene paleotemperatures from D/L ratios of isoleucine in lake sediment.</p>
+<p>Amino acid racemization (AAR) is temperature-sensitive: the rate at which the L-enantiomer converts to the D-form depends on both time and temperature via Arrhenius kinetics. In a sediment core whose age–depth relationship is independently constrained (e.g. by radiocarbon), the downcore D/L profile encodes the integrated thermal history of the lake bottom. AARP provides the machinery to decode it.</p>
+<div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pkg_install.html" class="external-link">pkg_install</a></span><span class="op">(</span><span class="st">"nickmckay/AARP"</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="two-stage-workflow">Two-stage workflow<a class="anchor" aria-label="anchor" href="#two-stage-workflow"></a>
+</h2>
+<p>Simultaneous inference of kinetics and temperature from a single core is under-determined. AARP separates the problem into two stages:</p>
+<pre><code>Stage 1 — Kinetics calibration
+  ├── Lab heating experiments (80/100/110 °C, controlled time)
+  └── Downcore D/L from a 4 °C lake (known temperature)
+          ↓
+  Posterior on (log Ae, Ea, x, log σ)
+
+Stage 2 — Temperature reconstruction
+  ├── Fixed kinetics from Stage 1
+  └── Downcore D/L from target lake (unknown temperature)
+          ↓
+  Posterior on temperature history T(t) at 6 control knots</code></pre>
+<p>Stage 1 uses heating experiments to constrain the Arrhenius relationship and a known-temperature (4 °C hypolimnion) calibration core to pin the power-law exponent. Stage 2 fixes kinetics at the Stage 1 posterior median and inverts D/L from a new core for temperature.</p>
+</div>
+<div class="section level2">
+<h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
+</h2>
+<div class="section level3">
+<h3 id="forward-model">Forward model<a class="anchor" aria-label="anchor" href="#forward-model"></a>
+</h3>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://nickmckay.github.io/AARP">AARP</a></span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Build a constant-rate age–depth model (50 cm/ka, 750 cm core)</span></span>
+<span><span class="va">am</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rate_to_age_model.html">rate_to_age_model</a></span><span class="op">(</span>rate_cm_per_ka <span class="op">=</span> <span class="fl">50</span>, max_depth_cm <span class="op">=</span> <span class="fl">750</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Simulate a downcore D/L profile under a linear 5→8 °C Holocene cooling</span></span>
+<span><span class="va">T_history</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>age_ka <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">10</span><span class="op">)</span>, temp_C <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">8</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">dl</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/racemize_depth_series.html">racemize_depth_series</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">750</span>, by <span class="op">=</span> <span class="fl">25</span><span class="op">)</span>, <span class="va">am</span>, <span class="va">T_history</span>,</span>
+<span>                            AAR_params <span class="op">=</span> <span class="va">default_AAR_params</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">dl</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="stage-1--kinetics-mcmc">Stage 1 — Kinetics MCMC<a class="anchor" aria-label="anchor" href="#stage-1--kinetics-mcmc"></a>
+</h3>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span>
+<span><span class="va">heating_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sim_heating_data.html">sim_heating_data</a></span><span class="op">(</span>sigma <span class="op">=</span> <span class="fl">0.01</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span><span class="va">cal_data</span>     <span class="op">&lt;-</span> <span class="fu"><a href="reference/sim_downcore_data.html">sim_downcore_data</a></span><span class="op">(</span><span class="va">am</span>, temp_model <span class="op">=</span> <span class="fl">4</span>,</span>
+<span>                                  sample_ages_ka <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">0.5</span>, <span class="fl">15</span>, by <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>,</span>
+<span>                                  sigma <span class="op">=</span> <span class="fl">0.015</span>, seed <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">mcmc_kin</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/run_mcmc.html">run_mcmc</a></span><span class="op">(</span></span>
+<span>  <span class="va">log_posterior_kinetics</span>,</span>
+<span>  init        <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>log_Ae <span class="op">=</span> <span class="fl">42.12</span>, Ea <span class="op">=</span> <span class="fl">31.5</span>, x <span class="op">=</span> <span class="fl">3.0</span>, log_sigma <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="fl">0.01</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  n_iter      <span class="op">=</span> <span class="fl">10000</span>,</span>
+<span>  proposal_sd <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>log_Ae <span class="op">=</span> <span class="fl">0.005</span>, Ea <span class="op">=</span> <span class="fl">0.05</span>, x <span class="op">=</span> <span class="fl">0.003</span>, log_sigma <span class="op">=</span> <span class="fl">0.008</span><span class="op">)</span>,</span>
+<span>  heating_data      <span class="op">=</span> <span class="va">heating_data</span>,</span>
+<span>  downcore_cal_data <span class="op">=</span> <span class="va">cal_data</span>,</span>
+<span>  age_model_cal     <span class="op">=</span> <span class="va">am</span>,</span>
+<span>  temp_cal          <span class="op">=</span> <span class="fl">4</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="reference/plot_mcmc_chains.html">plot_mcmc_chains</a></span><span class="op">(</span><span class="va">mcmc_kin</span>, burnin <span class="op">=</span> <span class="fl">1000</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/plot_posterior_kinetics.html">plot_posterior_kinetics</a></span><span class="op">(</span><span class="va">mcmc_kin</span>, burnin <span class="op">=</span> <span class="fl">1000</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="stage-2--temperature-reconstruction">Stage 2 — Temperature reconstruction<a class="anchor" aria-label="anchor" href="#stage-2--temperature-reconstruction"></a>
+</h3>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">kin_fixed</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/apply.html" class="external-link">apply</a></span><span class="op">(</span><span class="va">mcmc_kin</span><span class="op">$</span><span class="va">samples</span><span class="op">[</span><span class="fl">1001</span><span class="op">:</span><span class="fl">10000</span>, <span class="op">]</span>, <span class="fl">2</span>, <span class="va">median</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">target_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sim_downcore_data.html">sim_downcore_data</a></span><span class="op">(</span><span class="va">am</span>, temp_model <span class="op">=</span> <span class="va">T_history</span>,</span>
+<span>                                 sample_ages_ka <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">0.5</span>, <span class="fl">10</span>, by <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>,</span>
+<span>                                 sigma <span class="op">=</span> <span class="fl">0.015</span>, seed <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">knot_ages</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">2</span>, <span class="fl">4</span>, <span class="fl">6</span>, <span class="fl">8</span>, <span class="fl">10</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">mcmc_T</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/run_mcmc.html">run_mcmc</a></span><span class="op">(</span></span>
+<span>  <span class="va">log_posterior_temperature</span>,</span>
+<span>  init        <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>T_0ka <span class="op">=</span> <span class="fl">6</span>, T_2ka <span class="op">=</span> <span class="fl">6</span>, T_4ka <span class="op">=</span> <span class="fl">6</span>,</span>
+<span>                  T_6ka <span class="op">=</span> <span class="fl">6</span>, T_8ka <span class="op">=</span> <span class="fl">6</span>, T_10ka <span class="op">=</span> <span class="fl">6</span>, log_sigma <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="fl">0.015</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  n_iter      <span class="op">=</span> <span class="fl">10000</span>,</span>
+<span>  proposal_sd <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>T_0ka <span class="op">=</span> <span class="fl">0.3</span>, T_2ka <span class="op">=</span> <span class="fl">0.3</span>, T_4ka <span class="op">=</span> <span class="fl">0.3</span>,</span>
+<span>                  T_6ka <span class="op">=</span> <span class="fl">0.3</span>, T_8ka <span class="op">=</span> <span class="fl">0.3</span>, T_10ka <span class="op">=</span> <span class="fl">0.3</span>, log_sigma <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span>,</span>
+<span>  knot_ages_ka         <span class="op">=</span> <span class="va">knot_ages</span>,</span>
+<span>  kinetics_params      <span class="op">=</span> <span class="va">kin_fixed</span>,</span>
+<span>  downcore_target_data <span class="op">=</span> <span class="va">target_data</span>,</span>
+<span>  age_model_target     <span class="op">=</span> <span class="va">am</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="reference/plot_temperature_reconstruction.html">plot_temperature_reconstruction</a></span><span class="op">(</span><span class="va">mcmc_T</span>, knot_ages_ka <span class="op">=</span> <span class="va">knot_ages</span>, burnin <span class="op">=</span> <span class="fl">1000</span><span class="op">)</span></span></code></pre></div>
+</div>
+</div>
+<div class="section level2">
+<h2 id="vignettes">Vignettes<a class="anchor" aria-label="anchor" href="#vignettes"></a>
+</h2>
+<p>Full worked examples with synthetic data and diagnostic plots:</p>
+<table class="table">
+<colgroup>
+<col width="43%">
+<col width="56%">
+</colgroup>
+<thead><tr>
+<th>Vignette</th>
+<th>Description</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><a href="https://nickmckay.github.io/AARP/articles/forward-model-basics.html">Forward model basics</a></td>
+<td>Arrhenius kinetics, the power-law linearization, and seasonal temperature splitting</td>
+</tr>
+<tr>
+<td><a href="https://nickmckay.github.io/AARP/articles/depth-series.html">Depth-series simulation</a></td>
+<td>Building age–depth models and running the forward model on a sediment core</td>
+</tr>
+<tr>
+<td><a href="https://nickmckay.github.io/AARP/articles/kinetics-fitting.html">Stage 1: Kinetics estimation</a></td>
+<td>Bayesian calibration of Ae, Ea, and x from heating experiments and a 4 °C core</td>
+</tr>
+<tr>
+<td><a href="https://nickmckay.github.io/AARP/articles/temperature-reconstruction.html">Stage 2: Temperature reconstruction</a></td>
+<td>Inferring a Holocene temperature history from downcore D/L with prior specification and posterior predictive checks</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section level2">
+<h2 id="priors">Priors<a class="anchor" aria-label="anchor" href="#priors"></a>
+</h2>
+<p>Both stages use weakly informative priors centred on published Ile-Ile values from Kaufman (2000):</p>
+<table class="table">
+<thead><tr>
+<th>Parameter</th>
+<th>Prior</th>
+<th>Centre</th>
+<th>SD</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>log(<em>A</em>e)</td>
+<td>Normal</td>
+<td>42.12</td>
+<td>2</td>
+</tr>
+<tr>
+<td>
+<em>E</em>a (kcal/mol)</td>
+<td>Normal</td>
+<td>31.5</td>
+<td>5</td>
+</tr>
+<tr>
+<td><em>x</em></td>
+<td>Normal</td>
+<td>3</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td>log(σ)</td>
+<td>Normal</td>
+<td>log(0.02)</td>
+<td>1</td>
+</tr>
+<tr>
+<td>
+<em>T</em> knots (°C)</td>
+<td>Normal</td>
+<td>5</td>
+<td>3</td>
+</tr>
+<tr>
+<td>Δ<em>T</em> between knots</td>
+<td>Normal</td>
+<td>0</td>
+<td>2</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section level2">
+<h2 id="funding">Funding<a class="anchor" aria-label="anchor" href="#funding"></a>
+</h2>
+<p>Developed as part of NSF grant 2317409, <em>“Testing amino acid paleothermometry in radiocarbon-dated lake sediment.”</em></p>
+</div>
+<div class="section level2">
+<h2 id="citation">Citation<a class="anchor" aria-label="anchor" href="#citation"></a>
+</h2>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/citation.html" class="external-link">citation</a></span><span class="op">(</span><span class="st">"AARP"</span><span class="op">)</span></span></code></pre></div>
+</div>
 </div>
   </main><aside class="col-md-3"><div class="links">
 <h2 data-toc-skip>Links</h2>
@@ -92,7 +287,13 @@
 </ul>
 </div>
 
-
+<div class="dev-status">
+<h2 data-toc-skip>Dev status</h2>
+<ul class="list-unstyled">
+<li><a href="https://github.com/nickmckay/AARP/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/nickmckay/AARP/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
+<li><a href="https://nickmckay.github.io/AARP"><img src="https://github.com/nickmckay/AARP/actions/workflows/pkgdown.yaml/badge.svg" alt="pkgdown"></a></li>
+</ul>
+</div>
 
   </aside>
 </div>
