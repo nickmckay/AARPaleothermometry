@@ -1,3 +1,11 @@
+# AAR Paleothermometry forward model — functions.R
+# Written Jan 2023 for NSF 2317409. Defines the core racemization pipeline:
+# Arrhenius rate constant -> incremental D/L accumulation in power-law space ->
+# sediment temperature damping -> full per-sample integration.
+# Source powerLaw.R for sensitivity analysis; these functions are called from there.
+
+# Power-law exponent for linearizing D/L: D/L = Rx^(1/x). Default 3 used here;
+# powerLaw.R also tests x=4. Bada (1985) recommends 3 for isoleucine.
 x <- 3
 
 racemize <- function(age,sumT,winT,x,dT,startingDL = 0,scenario = NA,...){
@@ -19,6 +27,7 @@ racemize <- function(age,sumT,winT,x,dT,startingDL = 0,scenario = NA,...){
     
     Rx <- Rx + drSum + drWin 
   }
+  # Rx is accumulated in (D/L)^x space; back-transform here to return actual D/L.
   rac <- data.frame(age = max(age),
                         DL = Rx^(1/x),
                         scenario = scenario)
@@ -26,6 +35,11 @@ racemize <- function(age,sumT,winT,x,dT,startingDL = 0,scenario = NA,...){
   return(rac)
 }
 
+# As sediment is buried, the seasonal air temperature signal attenuates — summer
+# and winter sediment temps converge toward the mean annual. This is physically
+# motivated by thermal diffusion: the annual cycle damps with depth. We model it
+# as a linear interpolation from full seasonal amplitude (fresh, weight1=startDamp)
+# to attenuated (buried, weight1=endDamp) over dampTime ka.
 dampSedTemps <- function(sumT, 
                          winT, 
                          age, 
@@ -41,6 +55,9 @@ dampSedTemps <- function(sumT,
   filterStart <- max(age,na.rm = TRUE)
 
   ffrac <- (filterStart - age)/dampTime
+  # ffrac goes from 0 (oldest, fully buried) to 1 (youngest, at surface).
+  # tf is the weight on the same-season temperature; (1-tf) is the cross-season
+  # weight, so a deeply buried summer sediment layer gets partly 'winter' temp.
   tf <- endDamp*ffrac + startDamp*(1-ffrac)
   tf[tf < endDamp] <- endDamp
   
@@ -74,6 +91,8 @@ racemizeSample <- function(sampleAge,
                            ...){
 
 #figure out sample temperature history
+  # Select only the temperature history up to this sample's deposition age;
+  # older parts of the record are irrelevant because this grain wasn't there yet.
   ageIndex <- which(ageVec <= sampleAge)
   
   sAge <- ageVec[ageIndex]
@@ -121,6 +140,13 @@ plotInputs <- function(dampened){
 
 
 
+# --- Test/demo block ---
+# Exercises racemizeSample() over a 14 ka synthetic core with 3 segments:
+#   early (0-4.7 ka):  sumT=15, winT=4  (warm)
+#   middle (4.7-9.3 ka): sumT=15, winT=-20 (cold winters — glacial-like?)
+#   late (9.3-14 ka):  sumT=20, winT=4  (hot summers)
+# Note: endDamp has a typo (endDamep) on line 143 so endDamp falls back to
+# whatever value it holds from a previous run — fix before using this demo.
 dT <- 10 #timestep
 Rx <- 0 #starting racemization
 age <- (seq(00,14000,by = dT)/1000)
@@ -140,7 +166,7 @@ sampleAge <- (seq(00,14000,by = 100)/1000)
 
 #plot inputs for one sample
 startDamp <- 1
-endDamep <- .5
+endDamp <- .5
 dampTime <- 10
 dampened <- dampSedTemps(sumT = sumT,
                          winT = winT, 

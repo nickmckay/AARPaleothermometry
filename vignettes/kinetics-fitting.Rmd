@@ -1,0 +1,163 @@
+---
+title: "Bayesian Kinetics Estimation (Stage 1)"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Bayesian Kinetics Estimation (Stage 1)}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 7,
+  fig.height = 5
+)
+library(AARP)
+library(ggplot2)
+library(dplyr)
+```
+
+## Overview
+
+Stage 1 estimates the three AAR kinetic parameters ($A_e$: pre-exponential
+factor; $E_a$: activation energy; $x$: power-law exponent) from two
+data sources:
+
+1. **Lab heating experiments**: surface sediment heated at 80, 100, and 110°C
+   for known durations. Temperature is controlled; time is controlled; only
+   the resulting D/L is measured. These data tightly constrain the Arrhenius
+   relationship.
+
+2. **Downcore data from 4°C lakes**: lakes whose hypolimnion stays at a
+   near-constant 4°C year-round (deep, cold-climate lakes). Because
+   temperature is effectively known, the downcore D/L profile constrains how
+   D/L accumulates through time (i.e., the power-law exponent $x$).
+
+Together, these two data types break the degeneracy among the three parameters.
+
+We work in transformed space: $\log(A_e)$ (since $A_e \approx e^{42}$ is
+numerically unwieldy) and $\log(\sigma)$ for the observation noise (enforces
+positivity without hard truncation).
+
+## Generate synthetic data
+
+For this prototype we use synthetic data with known true parameters so we can
+verify recovery.
+
+```{r generate_data}
+set.seed(42)
+true_AAR <- default_AAR_params  # Ae=exp(42.12), Ea=31.5, x=3
+
+# Heating experiments: 3 temps × 8 times × 3 replicates = 72 observations
+heating_data <- sim_heating_data(AAR_params = true_AAR, sigma = 0.01, seed = 1)
+
+# Calibration core: 30 samples at 500-yr spacing to 15 ka in a 4°C lake
+am_cal   <- rate_to_age_model(rate_cm_per_ka = 50, max_depth_cm = 750)
+cal_data <- sim_downcore_data(am_cal,
+                              temp_model     = 4,
+                              sample_ages_ka = seq(0.5, 15, by = 0.5),
+                              AAR_params     = true_AAR,
+                              sigma          = 0.015,
+                              seed           = 2)
+```
+
+### Visualise the synthetic observations
+
+```{r plot_obs, fig.height=4}
+# Heating experiments
+ggplot(heating_data, aes(x = time_yr, y = DL_obs,
+                          color = factor(temp_C), group = factor(temp_C))) +
+  geom_point(size = 1.5) +
+  geom_line(aes(y = DL_pred), linewidth = 0.8) +
+  scale_x_log10() +
+  scale_color_brewer(palette = "Set1") +
+  labs(x = "Heating duration (yr, log scale)", y = "D/L",
+       color = "Temp (°C)", title = "Synthetic heating experiment data") +
+  theme_bw()
+```
+
+```{r plot_cal, fig.height=3.5}
+# Calibration core
+ggplot(cal_data, aes(x = DL_obs, y = depth_cm)) +
+  geom_point(size = 1.5, colour = "steelblue") +
+  geom_line(aes(x = DL_pred), colour = "grey50") +
+  scale_y_reverse() +
+  labs(x = "D/L", y = "Depth (cm)",
+       title = "Synthetic 4°C calibration core") +
+  theme_bw()
+```
+
+## Run Stage 1 MCMC
+
+We run a random-walk Metropolis-Hastings chain. Proposal standard deviations
+are set to target roughly 25% acceptance rate. Check `acceptance_rate` in
+the output and adjust `prop_kin` if needed.
+
+```{r mcmc_stage1, cache=TRUE}
+init_kin <- c(log_Ae    = 42.12,
+              Ea        = 31.5,
+              x         = 3.0,
+              log_sigma = log(0.01))
+
+prop_kin <- c(log_Ae    = 0.05,
+              Ea        = 0.3,
+              x         = 0.05,
+              log_sigma = 0.1)
+
+mcmc_kin <- run_mcmc(log_posterior_kinetics,
+                     init        = init_kin,
+                     n_iter      = 10000,
+                     proposal_sd = prop_kin,
+                     heating_data      = heating_data,
+                     downcore_cal_data = cal_data,
+                     age_model_cal     = am_cal,
+                     temp_cal          = 4)
+
+cat("Acceptance rate:", round(mcmc_kin$acceptance_rate * 100, 1), "%\n")
+```
+
+## Trace plots
+
+Burn-in (grey) should be discarded before summarising the posterior. Chains
+should look like white noise after burn-in, with no trend or drift.
+
+```{r traces, fig.height=7}
+plot_mcmc_chains(mcmc_kin, burnin = 1000)
+```
+
+## Posterior distributions
+
+Red dashed lines show the true parameter values used to generate the data.
+Posteriors should be centred near those lines.
+
+```{r posteriors}
+true_kin <- c(log_Ae    = 42.12,
+              Ea        = 31.5,
+              x         = 3.0,
+              log_sigma = log(0.01))
+
+plot_posterior_kinetics(mcmc_kin, true_params = true_kin, burnin = 1000)
+```
+
+## Posterior predictive check
+
+Draw 200 parameter sets from the posterior and run the forward model to
+confirm the fitted parameters reproduce the calibration core observations:
+
+```{r ppc}
+depths_check <- seq(0, 750, by = 15)
+posterior_predictive_DL(mcmc_kin,
+                        age_model     = am_cal,
+                        depths_cm     = depths_check,
+                        temp_model    = 4,
+                        observed_data = cal_data,
+                        burnin        = 1000,
+                        n_draws       = 200)
+```
+
+Points are the synthetic observations; the shaded ribbon is the 95% posterior
+predictive interval. Good coverage of the points confirms the model fits the
+data. These kinetics estimates are passed to Stage 2.
+```

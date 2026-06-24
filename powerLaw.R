@@ -1,8 +1,20 @@
+# AAR Paleothermometry sensitivity analysis — powerLaw.R
+# Written Jan 2023 for NSF 2317409 ("Testing amino acid paleothermometry in
+# radiocarbon-dated lake sediment"). The goal is to understand how different
+# Holocene temperature histories would produce distinguishable D/L signals,
+# and whether sediment burial damping obscures that signal.
+# Arrhenius parameters (Ae, Ea) use literature defaults; not yet calibrated to
+# Leah Marshall's calibration samples from the AAGL.
+
 #D/Lx = kTt + C	 (eq 1)
+# Placeholder for the integrated form — the incremental version dRacPL is used instead.
 racemizationPL <- function(kt,yr,C){
-  
+
 }
 
+# Incremental racemization in power-law space: (D/L)^x increases linearly with kt*dt.
+# Working in (D/L)^x rather than D/L is the Bada linearization — avoids the sigmoidal
+# curvature that makes D/L accumulation rate-dependent on the current value.
 dRacPL <- function(kt,delta.yr){
  deltaRacX <- kt * delta.yr
  return(deltaRacX)
@@ -11,6 +23,9 @@ dRacPL <- function(kt,delta.yr){
 
 #k = Ae–Ea/RT  or:  ln(k) = – (Ea/R) x T-1 + ln(A)	(eq 2)
 #R is a constant (0.001987 kcal K-1 mol-1).
+# Ea = 31.5 kcal/mol and Ae = exp(42.12) are standard literature values for
+# isoleucine epimerization in foraminifera (Kaufman 2000 context). These will need
+# to be fit to Leah's calibration samples once those are available.
 arrhenius <- function(Ae = exp(42.12),Ea = 31.5 ,Temp = 278,R = 0.001987){
   lnk <- -(Ea/R) * Temp^-1 + log(Ae)
   kt <- exp(lnk)
@@ -18,14 +33,18 @@ arrhenius <- function(Ae = exp(42.12),Ea = 31.5 ,Temp = 278,R = 0.001987){
   return(kt)
 }
 
+# x is the power-law exponent: D/L = Rx^(1/x). x=3 is a common choice; x=4 is also
+# tested later. Higher x compresses the upper end of the D/L scale more.
 x <- 3.0
 
+# Sanity check: 200 ka at 4°C then 200 ka at 6°C. Just confirms the loop works
+# and that a warmer period accelerates accumulation as expected.
 Rx <- 0
 Temp <- c(rep(4+273,200),rep(6+273,200))
 for(i in 2:400){
   dr <- dRacPL(arrhenius(Temp = Temp[i]),1000)
-  Rx[i] <- Rx[i-1] + dr 
-  
+  Rx[i] <- Rx[i-1] + dr
+
 }
 
 Rac <- Rx^(1/x)
@@ -37,10 +56,15 @@ plot(age,Rx,type = "l")
 
 # seasonality -------------------------------------------------------------
 
+# Key question: does seasonality matter, or does only mean annual temperature matter?
+# Because Arrhenius is nonlinear (exponential in 1/T), a 1°C warmer summer adds more
+# to kt than a 1°C cooler winter subtracts. So two sites with the same mean annual T
+# but different seasonal amplitudes will accumulate different D/L — this is the core
+# motivation for treating summer and winter half-years separately throughout the model.
 
 library(tidyverse)
 
-#simulate the effect of seasonality on a sample. 
+#simulate the effect of seasonality on a sample.
 sumT <- 15 #summer half year
 winT <- 4 # winter half year
 Rx <- 0 #starting racemization
@@ -112,6 +136,12 @@ ggplot(toplot) +
 
 # Changing temperature -----------------------------------------------------
 
+# Three Holocene summer temperature trends over 10 ka. The central question is whether
+# AAR D/L can distinguish a Holocene Thermal Maximum (warming → cooling) from a stable
+# or monotonically warming scenario — relevant to the "Holocene temperature conundrum"
+# (proxies show ~0.7°C late-Holocene cooling; models show warming).
+# Winter T held constant at 4°C so changes are driven by summer only.
+
 dT <- 10 #timestep
 Rx <- 0 #starting racemization
 age <- seq(0,10000,by = dT)/1000
@@ -177,7 +207,15 @@ ggplot(tp2) +
 
 # Changing temperature with damping ---------------------------------------
 
-
+# Repeats the three-scenario analysis but applies sediment burial damping:
+# as sediment is buried deeper, the seasonal air temperature signal attenuates —
+# summer and winter sediment temperatures converge toward the mean annual.
+# weight1 (full-signal weight) goes from 1.0 (surface) to 0.5 (buried),
+# weight0 (cross-season weight) mirrors it, so at full attenuation
+# sumTsed ≈ winTsed ≈ mean(sumT, winT).
+# The comparison with/without damping shows how much burial attenuates our ability
+# to detect temperature trends in D/L — older samples are most affected.
+# Age vector is reversed here (old to young) so the loop accumulates correctly.
 
 dT <- 10 #timestep
 Rx <- 0 #starting racemization
@@ -457,6 +495,8 @@ DampNL <- ggplot(tp2damp) +
   theme(legend.position = "none") +
   ggtitle("Temperature trend and racemization - with attenuation")
 
+# Re-run plots with x=4 to show how choice of power-law exponent affects visual
+# spread between scenarios — higher x stretches the D/L scale more at low values.
 x <- 4
 
 noDampL <- ggplot(tp2) + 
@@ -493,7 +533,14 @@ ggsave(annTrends,filename = "Annual temperature scenarios.pdf",scale = .75)
 
 # Wave temperature with damping ---------------------------------------
 
-
+# Second scenario set: non-monotonic Holocene-like patterns over 14 ka.
+# Three scenarios represent plausible paleoclimate histories at a lake site:
+#   "cool mid-Holocene" (sth/stl/sth): warm early + late, cool middle
+#   "warm mid-Holocene" (stl/sth/stl): cool early + late, warm middle (classic HTM)
+#   "dry lake" scenario: extreme winter cooling (-40°C) in the middle segment,
+#     representing a period when the lake was dry or ice-covered (glacial or arid interval)
+#     so the sediment was exposed to cold continental air rather than water temperatures.
+# The question is whether the resulting D/L patterns are distinguishable from each other.
 
 dT <- 10 #timestep
 Rx <- 0 #starting racemization
@@ -783,6 +830,7 @@ DampNL <- ggplot(tp2damp) +
   theme(legend.position = "none") +
   ggtitle("Temperature trend and racemization - with attenuation")
 
+# Re-run with x=4 for the wave scenarios — same reason as above.
 x <- 4
 
 noDampL <- ggplot(tp2) + 

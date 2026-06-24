@@ -1,0 +1,28 @@
+Package: AARP
+Title: Forward Model and Bayesian Inversion for Amino Acid Racemization Paleothermometry
+Version: 0.1.0
+Authors@R: person("Nick", "McKay", email = "nick@nau.edu", role = c("aut", "cre"),
+    comment = c(ORCID = "0000-0003-3598-4834"))
+Description: Simulates amino acid racemization (D/L ratios) in lake sediment
+    using an Arrhenius kinetics and power-law forward model with seasonal
+    temperature splitting and depth-dependent thermal diffusion attenuation.
+    Provides a two-stage Bayesian MCMC framework to (1) calibrate kinetic
+    parameters (Ae, Ea, x) from lab heating experiments and known-temperature
+    cores, and (2) infer paleotemperature histories from downcore D/L profiles.
+    Developed as part of NSF project 2317409 "Testing amino acid paleothermometry
+    in radiocarbon-dated lake sediment."
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends: R (>= 4.1.0)
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Imports:
+    ggplot2,
+    dplyr,
+    tidyr,
+    purrr,
+    rlang
+Suggests:
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr

@@ -1,0 +1,9 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^.*\.pdf$
+^\.gitignore$
+^\.git$
+^functions\.R$
+^powerLaw\.R$
+^depth_series\.R$
+^bayesian_inversion\.R$

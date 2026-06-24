@@ -1,0 +1,236 @@
+---
+title: "Holocene Temperature Reconstruction (Stage 2)"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Holocene Temperature Reconstruction (Stage 2)}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 7,
+  fig.height = 5
+)
+library(AARP)
+library(ggplot2)
+library(dplyr)
+```
+
+## Overview
+
+Stage 2 takes the kinetic parameters estimated in Stage 1 as fixed and infers
+the temperature history of a new ("target") core whose thermal history is
+unknown. The unknown is parameterised as a vector of temperatures at 6 control
+knots (0, 2, 4, 6, 8, 10 ka BP) connected by linear interpolation. A
+first-difference smoothness prior penalises large step-to-step changes.
+
+This two-stage approach avoids simultaneously inferring kinetics and
+temperature from the same data, which would be highly under-determined.
+
+## Stage 1 recap: retrieve kinetics
+
+We regenerate the Stage 1 MCMC with a fixed seed so the kinetics are
+reproducible across vignettes:
+
+```{r stage1, cache=TRUE}
+true_AAR <- default_AAR_params
+
+# Heating experiments
+heating_data <- sim_heating_data(AAR_params = true_AAR, sigma = 0.01, seed = 1)
+
+# Calibration core (4°C lake)
+am_cal   <- rate_to_age_model(rate_cm_per_ka = 50, max_depth_cm = 750)
+cal_data <- sim_downcore_data(am_cal,
+                              temp_model     = 4,
+                              sample_ages_ka = seq(0.5, 15, by = 0.5),
+                              AAR_params     = true_AAR,
+                              sigma          = 0.015,
+                              seed           = 2)
+
+init_kin <- c(log_Ae = 42.12, Ea = 31.5, x = 3.0, log_sigma = log(0.01))
+prop_kin <- c(log_Ae = 0.05,  Ea = 0.3,  x = 0.05, log_sigma = 0.1)
+
+mcmc_kin <- run_mcmc(log_posterior_kinetics,
+                     init              = init_kin,
+                     n_iter            = 10000,
+                     proposal_sd       = prop_kin,
+                     heating_data      = heating_data,
+                     downcore_cal_data = cal_data,
+                     age_model_cal     = am_cal,
+                     temp_cal          = 4)
+
+cat("Stage 1 acceptance rate:", round(mcmc_kin$acceptance_rate * 100, 1), "%\n")
+```
+
+Extract the posterior median for the kinetic parameters to use as fixed values
+in Stage 2:
+
+```{r kinetics_extract}
+burnin_idx   <- 1001:10000
+kin_post     <- mcmc_kin$samples[burnin_idx, ]
+
+kin_fixed <- c(
+  log_Ae    = median(kin_post[, "log_Ae"]),
+  Ea        = median(kin_post[, "Ea"]),
+  x         = median(kin_post[, "x"]),
+  log_sigma = median(kin_post[, "log_sigma"])
+)
+
+cat("Fixed kinetics used in Stage 2:\n")
+print(round(kin_fixed, 4))
+```
+
+## Synthesise the target core
+
+The target core comes from a lake with an unknown temperature history. For
+this demonstration we use a linear Holocene cooling scenario: 8°C at 10 ka BP
+declining to 5°C at present. Samples span 0.5 to 10 ka at 500-yr spacing.
+
+```{r target_core}
+true_T_history <- data.frame(age_ka = c(0, 10), temp_C = c(5, 8))
+
+am_target    <- rate_to_age_model(rate_cm_per_ka = 40, max_depth_cm = 400)
+target_data  <- sim_downcore_data(am_target,
+                                   temp_model     = true_T_history,
+                                   sample_ages_ka = seq(0.5, 10, by = 0.5),
+                                   AAR_params     = true_AAR,
+                                   sigma          = 0.015,
+                                   seed           = 3)
+
+ggplot(target_data, aes(x = DL_obs, y = depth_cm)) +
+  geom_point(size = 1.5, colour = "steelblue") +
+  geom_line(aes(x = DL_pred), colour = "grey50") +
+  scale_y_reverse() +
+  labs(x = "D/L", y = "Depth (cm)",
+       title = "Synthetic target core (true cooling: 8°C → 5°C)") +
+  theme_bw()
+```
+
+## Run Stage 2 MCMC
+
+The temperature parameterisation uses 6 control knots. Initialise near a
+plausible flat temperature and use a moderately diffuse proposal:
+
+```{r stage2, cache=TRUE}
+knot_ages  <- c(0, 2, 4, 6, 8, 10)  # ka BP
+
+init_T <- c(T_0ka  = 6, T_2ka  = 6, T_4ka  = 6,
+            T_6ka  = 6, T_8ka  = 6, T_10ka = 6,
+            log_sigma = log(0.015))
+
+prop_T <- c(T_0ka  = 0.3, T_2ka  = 0.3, T_4ka  = 0.3,
+            T_6ka  = 0.3, T_8ka  = 0.3, T_10ka = 0.3,
+            log_sigma = 0.1)
+
+mcmc_T <- run_mcmc(log_posterior_temperature,
+                   init              = init_T,
+                   n_iter            = 10000,
+                   proposal_sd       = prop_T,
+                   knot_ages_ka      = knot_ages,
+                   kinetics_params   = kin_fixed,
+                   downcore_target_data = target_data,
+                   age_model_target  = am_target)
+
+cat("Stage 2 acceptance rate:", round(mcmc_T$acceptance_rate * 100, 1), "%\n")
+```
+
+## Trace plots
+
+Check that chains mix well across all temperature knots:
+
+```{r traces, fig.height=9}
+plot_mcmc_chains(mcmc_T, burnin = 1000)
+```
+
+## Temperature reconstruction
+
+The reconstruction shows the posterior median (line), the 95% credible
+interval (ribbon), and the true temperature history (red dashed line):
+
+```{r reconstruction, fig.height=4.5}
+true_T_df <- data.frame(age_ka = knot_ages,
+                        temp_C = c(5, 5.6, 6.2, 6.8, 7.4, 8))
+
+plot_temperature_reconstruction(mcmc_T,
+                                knot_ages_ka   = knot_ages,
+                                true_T_history = true_T_df,
+                                burnin         = 1000)
+```
+
+The true cooling trend (red dashed line) should fall within the credible
+envelope. Uncertainty is largest at the oldest end of the record, where the
+cumulative integration of noisy D/L data limits resolution.
+
+## Posterior predictive check
+
+Verify that the recovered temperature history reproduces the observed D/L
+profile. For Stage 2 we draw temperature knots from the posterior, build a
+temperature history per draw, and run the forward model with the fixed
+kinetics:
+
+```{r ppc}
+post_T  <- tail(mcmc_T$samples, nrow(mcmc_T$samples) - 1000)
+T_cols  <- grep("^T_", colnames(post_T), value = TRUE)
+idx     <- sample(nrow(post_T), 200)
+
+kin_AAR <- list(Ae = exp(kin_fixed[["log_Ae"]]),
+                Ea = kin_fixed[["Ea"]],
+                R  = 0.001987,
+                x  = kin_fixed[["x"]])
+
+depths_check <- seq(0, 400, by = 10)
+
+pred_list <- lapply(idx, function(i) {
+  tmp_model <- data.frame(age_ka = knot_ages,
+                          temp_C = as.numeric(post_T[i, T_cols]))
+  fwd       <- racemize_depth_series(depths_check, am_target, tmp_model,
+                                     AAR_params = kin_AAR)
+  fwd$draw  <- i
+  fwd
+})
+pred_df <- do.call(rbind, pred_list)
+
+summ <- pred_df |>
+  dplyr::group_by(depth_cm) |>
+  dplyr::summarise(median = median(DL),
+                   lo95   = quantile(DL, 0.025),
+                   hi95   = quantile(DL, 0.975),
+                   .groups = "drop")
+
+ggplot(summ, aes(x = median, y = depth_cm)) +
+  geom_ribbon(aes(xmin = lo95, xmax = hi95, y = depth_cm),
+              fill = "steelblue", alpha = 0.3) +
+  geom_line(colour = "steelblue", linewidth = 1) +
+  geom_point(data = target_data, aes(x = DL_obs, y = depth_cm),
+             colour = "black", size = 1.5) +
+  scale_y_reverse() +
+  labs(x = "D/L", y = "Depth (cm)",
+       title = "Posterior predictive D/L profile") +
+  theme_bw()
+```
+
+## Identifiability and uncertainty
+
+Several factors govern the width of the credible interval:
+
+- **Number of samples**: more observations reduce uncertainty. Here we used 20
+  samples; real cores often have 15 to 30 dateable horizons.
+
+- **Observation noise** (`sigma`): analytical precision in the D/L measurement.
+  Modern HPLC achieves $\sigma \approx 0.01$ to $0.02$, consistent with the value
+  used here.
+
+- **Kinetics uncertainty**: we fixed kinetics at their Stage 1 posterior median.
+  Propagating the full Stage 1 posterior (i.e., drawing both kinetics and
+  temperature jointly) would widen the credible interval further. This remains
+  an area for future work.
+
+- **Holocene conundrum context**: proxy reconstructions typically show ~0.7°C
+  of Holocene cooling. A 3°C change (as used here) is easily detectable; the
+  0.7°C signal may require very precise D/L measurements and well-constrained
+  kinetics, which is why the project invests in both lab heating experiments
+  and multi-core calibration.
+```
