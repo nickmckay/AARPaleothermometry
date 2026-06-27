@@ -12,7 +12,9 @@ sim_downcore_data(
   sigma = 0.015,
   seed = NULL,
   sumT_model = NULL,
-  winT_model = NULL
+  winT_model = NULL,
+  toc_model = NULL,
+  f_bac = 0
 )
 }
 \arguments{
@@ -36,6 +38,11 @@ Default \code{\link{default_AAR_params}}.}
 \item{sumT_model}{Optional summer half-year temperature.}
 
 \item{winT_model}{Optional winter half-year temperature.}
+
+\item{toc_model}{Optional TOC interpolation function from
+\code{\link{make_toc_model}} for bacterial resetting. Default \code{NULL}.}
+
+\item{f_bac}{Bacterial resetting rate constant (yr\eqn{^{-1}}). Default \code{0}.}
 }
 \value{
 A data frame with columns: \code{depth_cm}, \code{deposition_age_ka},

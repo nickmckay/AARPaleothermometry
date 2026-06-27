@@ -64,6 +64,9 @@ sim_heating_data <- function(temps_C    = c(80, 100, 110),
 #' @param seed Optional integer seed.
 #' @param sumT_model Optional summer half-year temperature.
 #' @param winT_model Optional winter half-year temperature.
+#' @param toc_model Optional TOC interpolation function from
+#'   \code{\link{make_toc_model}} for bacterial resetting. Default `NULL`.
+#' @param f_bac Bacterial resetting rate constant (yr\eqn{^{-1}}). Default `0`.
 #'
 #' @return A data frame with columns: `depth_cm`, `deposition_age_ka`,
 #'   `age_ka`, `DL_pred`, `DL_obs`.
@@ -84,7 +87,9 @@ sim_downcore_data <- function(age_model,
                               sigma       = 0.015,
                               seed        = NULL,
                               sumT_model  = NULL,
-                              winT_model  = NULL) {
+                              winT_model  = NULL,
+                              toc_model   = NULL,
+                              f_bac       = 0) {
   if (!is.null(seed)) set.seed(seed)
 
   depths_cm <- age_model$age_to_depth(sample_ages_ka)
@@ -94,7 +99,9 @@ sim_downcore_data <- function(age_model,
                                temp_model = temp_model,
                                sumT_model = sumT_model,
                                winT_model = winT_model,
-                               AAR_params = AAR_params)
+                               AAR_params = AAR_params,
+                               toc_model  = toc_model,
+                               f_bac      = f_bac)
 
   fwd$age_ka  <- sample_ages_ka
   fwd$DL_pred <- fwd$DL

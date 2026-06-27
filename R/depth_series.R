@@ -1,3 +1,36 @@
+#' Build a TOC-depth model for bacterial resetting
+#'
+#' Creates a linear-interpolation function for total organic carbon (TOC) as a
+#' function of depth. The interpolant is used inside
+#' \code{\link{racemize_one_depth}} to scale the bacterial resetting term at
+#' each burial depth during time integration.
+#'
+#' @param depth_cm Numeric vector of measurement depths in cm. Must start at 0
+#'   and be monotonically increasing.
+#' @param toc_pct Numeric vector of TOC values (percent dry weight) at each
+#'   depth. Same length as \code{depth_cm}.
+#'
+#' @return A function `f(z_cm)` that returns TOC (percent) at any depth via
+#'   linear interpolation. Values beyond the data range are held constant at
+#'   the nearest endpoint (rule = 2).
+#'
+#' @seealso \code{\link{racemize_one_depth}} for how \code{toc_model} and
+#'   \code{f_bac} are used in the forward model.
+#'
+#' @examples
+#' toc_fn <- make_toc_model(depth_cm = c(0, 100, 300, 500),
+#'                          toc_pct  = c(5,   3,   1, 0.5))
+#' toc_fn(150)  # interpolated TOC at 150 cm
+#'
+#' @importFrom stats approxfun
+#' @export
+make_toc_model <- function(depth_cm, toc_pct) {
+  stopifnot(length(depth_cm) == length(toc_pct))
+  stopifnot(depth_cm[1] == 0)
+  stats::approxfun(depth_cm, toc_pct, rule = 2)
+}
+
+
 #' Build an age-depth model from tie-point depths and ages
 #'
 #' Creates a pair of linear-interpolation functions for converting between
@@ -188,6 +221,16 @@ predict_heating_DL <- function(temp_C, time_yr, AAR_params) {
 #' @param kappa_m2yr Sediment thermal diffusivity in m\eqn{^2}/yr. Used only
 #'   in seasonal mode to attenuate the seasonal anomaly with depth. Default
 #'   `1.6`.
+#' @param toc_model Optional TOC interpolation function from
+#'   \code{\link{make_toc_model}}. When supplied together with a nonzero
+#'   \code{f_bac}, bacterial resetting is applied at each timestep.
+#' @param f_bac Bacterial resetting rate constant (yr\eqn{^{-1}}). At each
+#'   timestep the accumulated \eqn{(D/L)^x} (Rx) is reduced by
+#'   \eqn{f\_bac \times (TOC_z / TOC_0) \times Rx \times dt}, where \eqn{TOC_z}
+#'   is the TOC at the current burial depth and \eqn{TOC_0} is the surface TOC.
+#'   Default `0` (pure abiotic racemization). Based on necromass turnover times
+#'   of hundreds to thousands of years from Braun et al. (2017), plausible
+#'   values are 1e-4 to 1e-2 yr\eqn{^{-1}}.
 #'
 #' @return A one-row data frame with columns `depth_cm`,
 #'   `deposition_age_ka`, and `DL`.
@@ -224,8 +267,11 @@ racemize_one_depth <- function(depth_cm,
                                winT_model = NULL,
                                dT_yr      = 10,
                                AAR_params = default_AAR_params,
-                               kappa_m2yr = 1.6) {
+                               kappa_m2yr = 1.6,
+                               toc_model  = NULL,
+                               f_bac      = 0) {
   seasonal <- !is.null(sumT_model) && !is.null(winT_model)
+  use_bac  <- !is.null(toc_model) && f_bac > 0
 
   t_dep_ka <- age_model$depth_to_age(depth_cm)
 
@@ -239,6 +285,8 @@ racemize_one_depth <- function(depth_cm,
 
   z_t_cm <- pmax(depth_cm - age_model$age_to_depth(t_steps), 0)
 
+  # Compute Arrhenius rate constants at all timesteps (vectorized regardless of
+  # whether bacterial correction is used)
   if (seasonal) {
     T_sum_bottom <- get_temp_at_time(t_steps, sumT_model)
     T_win_bottom <- get_temp_at_time(t_steps, winT_model)
@@ -254,15 +302,34 @@ racemize_one_depth <- function(depth_cm,
                         Temp = T_sed_sum + 273, R = AAR_params$R)
     kt_win <- arrhenius(Ae = AAR_params$Ae, Ea = AAR_params$Ea,
                         Temp = T_sed_win + 273, R = AAR_params$R)
-
-    Rx <- sum(dRacPL(kt_sum, dT_yr / 2) + dRacPL(kt_win, dT_yr / 2))
-
   } else {
-    # Holocene-period signals penetrate fully to typical depths (delta >> depth)
     T_sed <- get_temp_at_time(t_steps, temp_model)
     kt    <- arrhenius(Ae = AAR_params$Ae, Ea = AAR_params$Ea,
                        Temp = T_sed + 273, R = AAR_params$R)
-    Rx    <- sum(dRacPL(kt = kt, delta.yr = dT_yr))
+  }
+
+  # Accumulate D/L in power-law (Rx) space.
+  # Bacterial correction introduces a state-dependent decay term that depends on
+  # Rx at the previous step, so a sequential loop is required when f_bac > 0.
+  # When f_bac = 0 the vectorized sum is used (unchanged from abiotic model).
+  if (use_bac) {
+    toc_0 <- toc_model(0)
+    Rx    <- 0
+    for (i in seq_along(t_steps)) {
+      dRx_abiotic <- if (seasonal) {
+        dRacPL(kt_sum[i], dT_yr / 2) + dRacPL(kt_win[i], dT_yr / 2)
+      } else {
+        dRacPL(kt[i], dT_yr)
+      }
+      toc_z <- toc_model(z_t_cm[i])
+      Rx    <- max(Rx + dRx_abiotic - f_bac * (toc_z / toc_0) * Rx * dT_yr, 0)
+    }
+  } else {
+    Rx <- if (seasonal) {
+      sum(dRacPL(kt_sum, dT_yr / 2) + dRacPL(kt_win, dT_yr / 2))
+    } else {
+      sum(dRacPL(kt = kt, delta.yr = dT_yr))
+    }
   }
 
   data.frame(
@@ -292,6 +359,11 @@ racemize_one_depth <- function(depth_cm,
 #'   \code{\link{default_AAR_params}}.
 #' @param kappa_m2yr Sediment thermal diffusivity in m\eqn{^2}/yr. Default
 #'   `1.6`.
+#' @param toc_model Optional TOC interpolation function from
+#'   \code{\link{make_toc_model}}. Passed to each \code{\link{racemize_one_depth}}
+#'   call.
+#' @param f_bac Bacterial resetting rate constant (yr\eqn{^{-1}}). Default `0`.
+#'   See \code{\link{racemize_one_depth}} for details.
 #'
 #' @return A data frame with columns `depth_cm`, `deposition_age_ka`, `DL`.
 #'
@@ -313,7 +385,9 @@ racemize_depth_series <- function(depths_cm,
                                   winT_model = NULL,
                                   dT_yr      = 10,
                                   AAR_params = default_AAR_params,
-                                  kappa_m2yr = 1.6) {
+                                  kappa_m2yr = 1.6,
+                                  toc_model  = NULL,
+                                  f_bac      = 0) {
   purrr::map_dfr(depths_cm,
                  racemize_one_depth,
                  age_model  = age_model,
@@ -322,5 +396,7 @@ racemize_depth_series <- function(depths_cm,
                  winT_model = winT_model,
                  dT_yr      = dT_yr,
                  AAR_params = AAR_params,
-                 kappa_m2yr = kappa_m2yr)
+                 kappa_m2yr = kappa_m2yr,
+                 toc_model  = toc_model,
+                 f_bac      = f_bac)
 }

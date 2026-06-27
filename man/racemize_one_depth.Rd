@@ -12,7 +12,9 @@ racemize_one_depth(
   winT_model = NULL,
   dT_yr = 10,
   AAR_params = default_AAR_params,
-  kappa_m2yr = 1.6
+  kappa_m2yr = 1.6,
+  toc_model = NULL,
+  f_bac = 0
 )
 }
 \arguments{
@@ -39,6 +41,18 @@ with \code{sumT_model} to activate seasonal mode.}
 \item{kappa_m2yr}{Sediment thermal diffusivity in m\eqn{^2}/yr. Used only
 in seasonal mode to attenuate the seasonal anomaly with depth. Default
 \code{1.6}.}
+
+\item{toc_model}{Optional TOC interpolation function from
+\code{\link{make_toc_model}}. When supplied together with a nonzero
+\code{f_bac}, bacterial resetting is applied at each timestep.}
+
+\item{f_bac}{Bacterial resetting rate constant (yr\eqn{^{-1}}). At each
+timestep the accumulated \eqn{(D/L)^x} (Rx) is reduced by
+\eqn{f\_bac \times (TOC_z / TOC_0) \times Rx \times dt}, where \eqn{TOC_z}
+is the TOC at the current burial depth and \eqn{TOC_0} is the surface TOC.
+Default \code{0} (pure abiotic racemization). Based on necromass turnover times
+of hundreds to thousands of years from Braun et al. (2017), plausible
+values are 1e-4 to 1e-2 yr\eqn{^{-1}}.}
 }
 \value{
 A one-row data frame with columns \code{depth_cm},

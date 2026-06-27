@@ -12,7 +12,9 @@ racemize_depth_series(
   winT_model = NULL,
   dT_yr = 10,
   AAR_params = default_AAR_params,
-  kappa_m2yr = 1.6
+  kappa_m2yr = 1.6,
+  toc_model = NULL,
+  f_bac = 0
 )
 }
 \arguments{
@@ -36,6 +38,13 @@ racemize_depth_series(
 
 \item{kappa_m2yr}{Sediment thermal diffusivity in m\eqn{^2}/yr. Default
 \code{1.6}.}
+
+\item{toc_model}{Optional TOC interpolation function from
+\code{\link{make_toc_model}}. Passed to each \code{\link{racemize_one_depth}}
+call.}
+
+\item{f_bac}{Bacterial resetting rate constant (yr\eqn{^{-1}}). Default \code{0}.
+See \code{\link{racemize_one_depth}} for details.}
 }
 \value{
 A data frame with columns \code{depth_cm}, \code{deposition_age_ka}, \code{DL}.
