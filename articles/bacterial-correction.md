@@ -40,10 +40,11 @@ toc_fn <- make_toc_model(depth_cm = depths_toc, toc_pct = toc_vals)
 
 data.frame(depth_cm = seq(0, 500, 5),
            toc      = toc_fn(seq(0, 500, 5))) |>
-  ggplot(aes(x = toc, y = depth_cm)) +
+  ggplot(aes(x = depth_cm, y = toc)) +
   geom_line(colour = "sienna", linewidth = 1) +
-  scale_y_reverse() +
-  labs(x = "TOC (%)", y = "Depth (cm)",
+  scale_x_reverse() +
+  coord_flip() +
+  labs(x = "Depth (cm)", y = "TOC (%)",
        title = "Synthetic TOC profile (exponential decay)") +
   theme_bw()
 ```
@@ -76,11 +77,12 @@ res <- lapply(seq_along(f_bac_vals), function(j) {
 
 do.call(rbind, res) |>
   mutate(scenario = factor(scenario, levels = labels)) |>
-  ggplot(aes(x = DL, y = depth_cm, colour = scenario)) +
+  ggplot(aes(x = depth_cm, y = DL, colour = scenario)) +
   geom_line(linewidth = 1) +
-  scale_y_reverse() +
+  scale_x_reverse() +
+  coord_flip() +
   scale_colour_brewer(palette = "Reds") +
-  labs(x = "D/L", y = "Depth (cm)", colour = NULL,
+  labs(x = "Depth (cm)", y = "D/L", colour = NULL,
        title = "Bacterial resetting suppresses D/L relative to abiotic model",
        subtitle = "T = 5 deg C constant, 50 cm/ka sedimentation rate") +
   theme_bw() +
@@ -127,11 +129,12 @@ bias_df <- data.frame(
   bias_C     = apparent_T - 5
 ) |> filter(!is.na(apparent_T))
 
-ggplot(bias_df, aes(x = bias_C, y = depth_cm)) +
-  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50") +
+ggplot(bias_df, aes(x = depth_cm, y = bias_C)) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
   geom_line(colour = "steelblue", linewidth = 1) +
-  scale_y_reverse() +
-  labs(x = "Apparent temperature bias (deg C)", y = "Depth (cm)",
+  scale_x_reverse() +
+  coord_flip() +
+  labs(x = "Depth (cm)", y = "Apparent temperature bias (deg C)",
        title = "Apparent cooling bias from ignoring bacterial reworking",
        subtitle = "f_bac = 1e-3 yr^-1, T = 5 deg C true") +
   theme_bw()
@@ -176,11 +179,12 @@ bind_rows(do.call(rbind, res2), abiotic) |>
   mutate(scenario = factor(scenario,
     levels = c("Abiotic (no correction)", "Fast decay (e-fold 20 cm)",
                "Medium decay (e-fold 60 cm)", "Slow decay (e-fold 150 cm)"))) |>
-  ggplot(aes(x = DL, y = depth_cm, colour = scenario)) +
+  ggplot(aes(x = depth_cm, y = DL, colour = scenario)) +
   geom_line(linewidth = 1) +
-  scale_y_reverse() +
+  scale_x_reverse() +
+  coord_flip() +
   scale_colour_brewer(palette = "Set1") +
-  labs(x = "D/L", y = "Depth (cm)", colour = NULL,
+  labs(x = "Depth (cm)", y = "D/L", colour = NULL,
        title = "TOC decay rate controls depth of bacterial influence",
        subtitle = "f_bac = 1e-3 yr^-1 in all corrected scenarios") +
   theme_bw() +
@@ -216,14 +220,15 @@ data.frame(
   age_ka   = am_lake$depth_to_age(plot_depths),
   toc      = toc_lake_fn(plot_depths)
 ) |>
-  ggplot(aes(x = toc, y = depth_cm)) +
+  ggplot(aes(x = depth_cm, y = toc)) +
   geom_line(colour = "sienna", linewidth = 1) +
   geom_point(data = data.frame(depth_cm = depths_lake, toc = toc_lake),
              colour = "sienna", size = 2) +
-  scale_y_reverse(
+  scale_x_reverse(
     sec.axis = sec_axis(~ . / 50, name = "Age (ka BP)")
   ) +
-  labs(x = "TOC (%)", y = "Depth (cm)",
+  coord_flip() +
+  labs(x = "Depth (cm)", y = "TOC (%)",
        title = "Lake sediment TOC profile: mid-Holocene productivity peak") +
   theme_bw()
 ```
@@ -256,11 +261,12 @@ res_lake <- lapply(seq_along(f_bac_vals), function(j) {
 
 do.call(rbind, res_lake) |>
   mutate(scenario = factor(scenario, levels = labels)) |>
-  ggplot(aes(x = DL, y = depth_cm, colour = scenario)) +
+  ggplot(aes(x = depth_cm, y = DL, colour = scenario)) +
   geom_line(linewidth = 1) +
-  scale_y_reverse() +
+  scale_x_reverse() +
+  coord_flip() +
   scale_colour_brewer(palette = "Reds") +
-  labs(x = "D/L", y = "Depth (cm)", colour = NULL,
+  labs(x = "Depth (cm)", y = "D/L", colour = NULL,
        title = "Humped TOC creates a D/L dip at mid-Holocene depths",
        subtitle = "T = 5 deg C constant; strongest resetting at ~250 cm (5 ka)") +
   theme_bw() +
@@ -314,12 +320,13 @@ bias_lake <- bind_rows(
 )
 
 ggplot(bias_lake |> filter(!is.na(apparent_T)),
-       aes(x = bias_C, y = depth_cm, colour = scenario)) +
-  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50") +
+       aes(x = depth_cm, y = bias_C, colour = scenario)) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
   geom_line(linewidth = 1) +
-  scale_y_reverse() +
+  scale_x_reverse() +
+  coord_flip() +
   scale_colour_manual(values = c("steelblue", "tomato")) +
-  labs(x = "Apparent temperature bias (deg C)", y = "Depth (cm)",
+  labs(x = "Depth (cm)", y = "Apparent temperature bias (deg C)",
        colour = NULL,
        title = "Non-monotonic TOC creates spurious mid-Holocene cooling",
        subtitle = "True temperature is constant 5 deg C throughout") +
