@@ -197,6 +197,147 @@ bind_rows(do.call(rbind, res2), abiotic) |>
   theme(legend.position = "bottom")
 ```
 
+## Lake sediment example: humped TOC profile
+
+Marine sediment TOC profiles almost always decrease monotonically with depth
+as organic matter degrades. Lake sediments can behave very differently. A
+lake whose productivity varied through the Holocene — perhaps peaking during
+a warm, wet mid-Holocene optimum — can show a TOC profile that rises with
+depth before eventually declining. Here we construct a profile representative
+of such a lake: ~5% TOC at the surface, rising to ~15% in the mid-Holocene,
+and returning to ~5% by the early Holocene.
+
+```{r lake_toc_profile, fig.height = 4}
+# Age-depth model: 50 cm/ka, 10 ka core
+# Surface (0 ka) = 0 cm; mid-Holocene (5 ka) = 250 cm; base (10 ka) = 500 cm
+am_lake <- rate_to_age_model(rate_cm_per_ka = 50, max_depth_cm = 500)
+
+depths_lake <- c(  0,  50, 150, 250, 350, 450, 500)
+toc_lake    <- c(  5,   7,  12,  15,  10,   6,   5)
+toc_lake_fn <- make_toc_model(depth_cm = depths_lake, toc_pct = toc_lake)
+
+plot_depths <- seq(0, 500, by = 5)
+data.frame(
+  depth_cm = plot_depths,
+  age_ka   = am_lake$depth_to_age(plot_depths),
+  toc      = toc_lake_fn(plot_depths)
+) |>
+  ggplot(aes(x = toc, y = depth_cm)) +
+  geom_line(colour = "sienna", linewidth = 1) +
+  geom_point(data = data.frame(depth_cm = depths_lake, toc = toc_lake),
+             colour = "sienna", size = 2) +
+  scale_y_reverse(
+    sec.axis = sec_axis(~ . / 50, name = "Age (ka BP)")
+  ) +
+  labs(x = "TOC (%)", y = "Depth (cm)",
+       title = "Lake sediment TOC profile: mid-Holocene productivity peak") +
+  theme_bw()
+```
+
+Notice that TOC at 250 cm (mid-Holocene) is three times the surface value.
+Because the model normalises bacterial resetting to surface TOC, the
+`TOC_z / TOC_0` ratio reaches 3 at that depth, making bacterial resetting
+*three times stronger* there than at the surface.
+
+### D/L profiles under different resetting rates
+
+```{r lake_dl_profiles}
+depths <- seq(0, 500, by = 10)
+
+f_bac_vals <- c(0, 1e-4, 1e-3, 5e-3)
+labels     <- c("f_bac = 0 (abiotic)", "f_bac = 1e-4", "f_bac = 1e-3", "f_bac = 5e-3")
+
+res_lake <- lapply(seq_along(f_bac_vals), function(j) {
+  out <- racemize_depth_series(depths,
+                               age_model  = am_lake,
+                               temp_model = 5,
+                               toc_model  = toc_lake_fn,
+                               f_bac      = f_bac_vals[j])
+  out$scenario <- labels[j]
+  out
+})
+
+do.call(rbind, res_lake) |>
+  mutate(scenario = factor(scenario, levels = labels)) |>
+  ggplot(aes(x = DL, y = depth_cm, colour = scenario)) +
+  geom_line(linewidth = 1) +
+  scale_y_reverse() +
+  scale_colour_brewer(palette = "Reds") +
+  labs(x = "D/L", y = "Depth (cm)", colour = NULL,
+       title = "Humped TOC creates a D/L dip at mid-Holocene depths",
+       subtitle = "T = 5 deg C constant; strongest resetting at ~250 cm (5 ka)") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+```
+
+The D/L profiles develop a visible inflection or dip near 250 cm at higher
+`f_bac` values. The curve is no longer monotonically increasing with depth.
+At 500 cm the profiles converge back toward the abiotic case because TOC has
+returned to its surface value (ratio = 1) and the early-Holocene sediment
+experienced lower resetting rates throughout its burial history.
+
+### The spurious temperature signal
+
+This is the key problem for paleothermometry: an abiotic inversion applied
+to a bacterially reworked D/L profile would interpret the mid-Holocene D/L
+dip as a real temperature signal. We can estimate the implied apparent
+temperature at each depth using the same grid-search approach as above.
+
+```{r lake_temp_bias}
+T_grid <- seq(1, 10, by = 0.1)
+
+compute_apparent_T <- function(toc_fn, f_bac_val, true_T = 5) {
+  bac_out <- racemize_depth_series(depths, am_lake,
+                                   temp_model = true_T,
+                                   toc_model  = toc_fn,
+                                   f_bac      = f_bac_val)
+  apparent <- sapply(seq_along(depths), function(di) {
+    target <- bac_out$DL[di]
+    if (target == 0) return(NA_real_)
+    ab_DL <- sapply(T_grid, function(T) {
+      racemize_depth_series(depths[di], am_lake, temp_model = T)$DL
+    })
+    T_grid[which.min((ab_DL - target)^2)]
+  })
+  data.frame(depth_cm   = depths,
+             age_ka     = am_lake$depth_to_age(depths),
+             apparent_T = apparent,
+             bias_C     = apparent - true_T,
+             toc        = toc_fn(depths))
+}
+
+bias_lake <- bind_rows(
+  mutate(compute_apparent_T(toc_lake_fn, 1e-3), scenario = "f_bac = 1e-3"),
+  mutate(compute_apparent_T(toc_lake_fn, 5e-3), scenario = "f_bac = 5e-3")
+)
+
+ggplot(bias_lake |> filter(!is.na(apparent_T)),
+       aes(x = bias_C, y = depth_cm, colour = scenario)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_line(linewidth = 1) +
+  scale_y_reverse() +
+  scale_colour_manual(values = c("steelblue", "tomato")) +
+  labs(x = "Apparent temperature bias (deg C)", y = "Depth (cm)",
+       colour = NULL,
+       title = "Non-monotonic TOC creates spurious mid-Holocene cooling",
+       subtitle = "True temperature is constant 5 deg C throughout") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+```
+
+The apparent temperature is not simply cooler everywhere: it has a structured
+depth pattern that mirrors the TOC hump. Near the surface, apparent
+temperature is slightly cool (resetting rate proportional to 5% TOC). In the
+mid-Holocene, bacterial resetting is strongest (15% TOC, ratio = 3), producing
+the largest apparent cooling, up to several degrees C for `f_bac = 5e-3`.
+Below 250 cm, as TOC declines back to 5%, the bias shrinks.
+
+The practical implication: **a Holocene productivity event can masquerade as
+a Holocene temperature event in the D/L record**. If a lake has independent
+evidence of mid-Holocene high productivity (e.g., high biogenic silica, high
+organic matter flux), this correction should be applied before attempting a
+temperature reconstruction.
+
 ## Practical guidance
 
 - **If TOC data are available**, construct a `toc_model` with `make_toc_model()`
@@ -209,6 +350,13 @@ bind_rows(do.call(rbind, res2), abiotic) |>
 - **Cold, oligotrophic lake sediments** (low TOC, low temperature):
   bacterial activity is much lower. TOC < 1% and temperatures near 4 deg C
   suggest `f_bac` closer to 1e-4 yr^-1 or smaller.
+
+- **Productive lake sediments with non-monotonic TOC**: as shown above, a
+  mid-Holocene productivity peak can create a structured apparent temperature
+  signal that resembles real Holocene climate variability. If independent
+  proxies (biogenic silica, organic matter flux, pollen) indicate past
+  productivity changes, a measured downcore TOC profile should be used rather
+  than a simple decay model.
 
 - **Default behaviour** (`f_bac = 0`): pure abiotic racemization, identical to
   all prior results. Bacterial correction is strictly opt-in.
