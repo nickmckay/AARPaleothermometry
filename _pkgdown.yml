@@ -33,6 +33,8 @@ navbar:
           href: articles/kinetics-fitting.html
         - text: "Stage 2 — Holocene temperature reconstruction"
           href: articles/temperature-reconstruction.html
+        - text: "Bacterial resetting of D/L ratios"
+          href: articles/bacterial-correction.html
 
 reference:
   - title: "Forward model"
@@ -51,12 +53,14 @@ reference:
       - diffusion_attenuation
       - dampSedTemps
 
-  - title: "Age–depth models"
+  - title: "Age–depth and TOC models"
     desc: >
-      Construct and query age–depth relationships for sediment cores.
+      Construct and query age–depth relationships and TOC profiles for sediment
+      cores.
     contents:
       - make_age_model
       - rate_to_age_model
+      - make_toc_model
 
   - title: "Simulation"
     desc: >
