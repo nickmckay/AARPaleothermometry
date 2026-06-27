@@ -1,6 +1,7 @@
 <urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url><loc>https://nickmckay.github.io/AARP/404.html</loc></url>
 <url><loc>https://nickmckay.github.io/AARP/LICENSE-text.html</loc></url>
+<url><loc>https://nickmckay.github.io/AARP/articles/bacterial-correction.html</loc></url>
 <url><loc>https://nickmckay.github.io/AARP/articles/depth-series.html</loc></url>
 <url><loc>https://nickmckay.github.io/AARP/articles/forward-model-basics.html</loc></url>
 <url><loc>https://nickmckay.github.io/AARP/articles/index.html</loc></url>
@@ -23,6 +24,7 @@
 <url><loc>https://nickmckay.github.io/AARP/reference/log_prior_kinetics.html</loc></url>
 <url><loc>https://nickmckay.github.io/AARP/reference/log_prior_temperature.html</loc></url>
 <url><loc>https://nickmckay.github.io/AARP/reference/make_age_model.html</loc></url>
+<url><loc>https://nickmckay.github.io/AARP/reference/make_toc_model.html</loc></url>
 <url><loc>https://nickmckay.github.io/AARP/reference/plotInputs.html</loc></url>
 <url><loc>https://nickmckay.github.io/AARP/reference/plot_mcmc_chains.html</loc></url>
 <url><loc>https://nickmckay.github.io/AARP/reference/plot_posterior_kinetics.html</loc></url>

@@ -17,7 +17,9 @@ racemize_depth_series(
   winT_model = NULL,
   dT_yr = 10,
   AAR_params = default_AAR_params,
-  kappa_m2yr = 1.6
+  kappa_m2yr = 1.6,
+  toc_model = NULL,
+  f_bac = 0
 )
 ```
 
@@ -60,6 +62,20 @@ racemize_depth_series(
 - kappa_m2yr:
 
   Sediment thermal diffusivity in m\\^2\\/yr. Default `1.6`.
+
+- toc_model:
+
+  Optional TOC interpolation function from
+  [`make_toc_model`](https://nickmckay.github.io/AARP/reference/make_toc_model.md).
+  Passed to each
+  [`racemize_one_depth`](https://nickmckay.github.io/AARP/reference/racemize_one_depth.md)
+  call.
+
+- f_bac:
+
+  Bacterial resetting rate constant (yr\\^{-1}\\). Default `0`. See
+  [`racemize_one_depth`](https://nickmckay.github.io/AARP/reference/racemize_one_depth.md)
+  for details.
 
 ## Value
 

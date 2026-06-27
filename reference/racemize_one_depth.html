@@ -31,6 +31,7 @@ the seasonal signal."></head><body>
     <li><a class="dropdown-item" href="../articles/depth-series.html">Depth-series simulation</a></li>
     <li><a class="dropdown-item" href="../articles/kinetics-fitting.html">Stage 1 — Bayesian kinetics estimation</a></li>
     <li><a class="dropdown-item" href="../articles/temperature-reconstruction.html">Stage 2 — Holocene temperature reconstruction</a></li>
+    <li><a class="dropdown-item" href="../articles/bacterial-correction.html">Bacterial resetting of D/L ratios</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -68,7 +69,9 @@ the seasonal signal.</p>
 <span>  winT_model <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  dT_yr <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  AAR_params <span class="op">=</span> <span class="va">default_AAR_params</span>,</span>
-<span>  kappa_m2yr <span class="op">=</span> <span class="fl">1.6</span></span>
+<span>  kappa_m2yr <span class="op">=</span> <span class="fl">1.6</span>,</span>
+<span>  toc_model <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  f_bac <span class="op">=</span> <span class="fl">0</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -114,6 +117,22 @@ with <code>sumT_model</code> to activate seasonal mode.</p></dd>
 <dd><p>Sediment thermal diffusivity in m\(^2\)/yr. Used only
 in seasonal mode to attenuate the seasonal anomaly with depth. Default
 <code>1.6</code>.</p></dd>
+
+
+<dt id="arg-toc-model">toc_model<a class="anchor" aria-label="anchor" href="#arg-toc-model"></a></dt>
+<dd><p>Optional TOC interpolation function from
+<code><a href="make_toc_model.html">make_toc_model</a></code>. When supplied together with a nonzero
+<code>f_bac</code>, bacterial resetting is applied at each timestep.</p></dd>
+
+
+<dt id="arg-f-bac">f_bac<a class="anchor" aria-label="anchor" href="#arg-f-bac"></a></dt>
+<dd><p>Bacterial resetting rate constant (yr\(^{-1}\)). At each
+timestep the accumulated \((D/L)^x\) (Rx) is reduced by
+\(f\_bac \times (TOC_z / TOC_0) \times Rx \times dt\), where \(TOC_z\)
+is the TOC at the current burial depth and \(TOC_0\) is the surface TOC.
+Default <code>0</code> (pure abiotic racemization). Based on necromass turnover times
+of hundreds to thousands of years from Braun et al. (2017), plausible
+values are 1e-4 to 1e-2 yr\(^{-1}\).</p></dd>
 
 </dl></div>
     <div class="section level2">

@@ -16,7 +16,9 @@ sim_downcore_data(
   sigma = 0.015,
   seed = NULL,
   sumT_model = NULL,
-  winT_model = NULL
+  winT_model = NULL,
+  toc_model = NULL,
+  f_bac = 0
 )
 ```
 
@@ -59,6 +61,16 @@ sim_downcore_data(
 - winT_model:
 
   Optional winter half-year temperature.
+
+- toc_model:
+
+  Optional TOC interpolation function from
+  [`make_toc_model`](https://nickmckay.github.io/AARP/reference/make_toc_model.md)
+  for bacterial resetting. Default `NULL`.
+
+- f_bac:
+
+  Bacterial resetting rate constant (yr\\^{-1}\\). Default `0`.
 
 ## Value
 

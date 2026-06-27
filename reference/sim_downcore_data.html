@@ -27,6 +27,7 @@ core (Stage 2)."></head><body>
     <li><a class="dropdown-item" href="../articles/depth-series.html">Depth-series simulation</a></li>
     <li><a class="dropdown-item" href="../articles/kinetics-fitting.html">Stage 1 — Bayesian kinetics estimation</a></li>
     <li><a class="dropdown-item" href="../articles/temperature-reconstruction.html">Stage 2 — Holocene temperature reconstruction</a></li>
+    <li><a class="dropdown-item" href="../articles/bacterial-correction.html">Bacterial resetting of D/L ratios</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -62,7 +63,9 @@ core (Stage 2).</p>
 <span>  sigma <span class="op">=</span> <span class="fl">0.015</span>,</span>
 <span>  seed <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  sumT_model <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  winT_model <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  winT_model <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  toc_model <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  f_bac <span class="op">=</span> <span class="fl">0</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -105,6 +108,15 @@ Default <code><a href="default_AAR_params.html">default_AAR_params</a></code>.</
 
 <dt id="arg-wint-model">winT_model<a class="anchor" aria-label="anchor" href="#arg-wint-model"></a></dt>
 <dd><p>Optional winter half-year temperature.</p></dd>
+
+
+<dt id="arg-toc-model">toc_model<a class="anchor" aria-label="anchor" href="#arg-toc-model"></a></dt>
+<dd><p>Optional TOC interpolation function from
+<code><a href="make_toc_model.html">make_toc_model</a></code> for bacterial resetting. Default <code>NULL</code>.</p></dd>
+
+
+<dt id="arg-f-bac">f_bac<a class="anchor" aria-label="anchor" href="#arg-f-bac"></a></dt>
+<dd><p>Bacterial resetting rate constant (yr\(^{-1}\)). Default <code>0</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">

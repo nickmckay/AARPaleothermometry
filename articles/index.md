@@ -2,6 +2,8 @@
 
 ### All vignettes
 
+- [Bacterial Resetting of D/L
+  Ratios](https://nickmckay.github.io/AARP/articles/bacterial-correction.md):
 - [Depth-Series Forward
   Model](https://nickmckay.github.io/AARP/articles/depth-series.md):
 - [Racemization

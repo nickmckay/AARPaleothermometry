@@ -29,14 +29,17 @@ utilities.
 - [`dampSedTemps()`](https://nickmckay.github.io/AARP/reference/dampSedTemps.md)
   : Apply sediment burial temperature damping
 
-## Age–depth models
+## Age–depth and TOC models
 
-Construct and query age–depth relationships for sediment cores.
+Construct and query age–depth relationships and TOC profiles for
+sediment cores.
 
 - [`make_age_model()`](https://nickmckay.github.io/AARP/reference/make_age_model.md)
   : Build an age-depth model from tie-point depths and ages
 - [`rate_to_age_model()`](https://nickmckay.github.io/AARP/reference/rate_to_age_model.md)
   : Build an age-depth model from a constant sedimentation rate
+- [`make_toc_model()`](https://nickmckay.github.io/AARP/reference/make_toc_model.md)
+  : Build a TOC-depth model for bacterial resetting
 
 ## Simulation
 

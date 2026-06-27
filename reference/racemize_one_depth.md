@@ -18,7 +18,9 @@ racemize_one_depth(
   winT_model = NULL,
   dT_yr = 10,
   AAR_params = default_AAR_params,
-  kappa_m2yr = 1.6
+  kappa_m2yr = 1.6,
+  toc_model = NULL,
+  f_bac = 0
 )
 ```
 
@@ -63,6 +65,23 @@ racemize_one_depth(
 
   Sediment thermal diffusivity in m\\^2\\/yr. Used only in seasonal mode
   to attenuate the seasonal anomaly with depth. Default `1.6`.
+
+- toc_model:
+
+  Optional TOC interpolation function from
+  [`make_toc_model`](https://nickmckay.github.io/AARP/reference/make_toc_model.md).
+  When supplied together with a nonzero `f_bac`, bacterial resetting is
+  applied at each timestep.
+
+- f_bac:
+
+  Bacterial resetting rate constant (yr\\^{-1}\\). At each timestep the
+  accumulated \\(D/L)^x\\ (Rx) is reduced by \\f\\bac \times (TOC_z /
+  TOC_0) \times Rx \times dt\\, where \\TOC_z\\ is the TOC at the
+  current burial depth and \\TOC_0\\ is the surface TOC. Default `0`
+  (pure abiotic racemization). Based on necromass turnover times of
+  hundreds to thousands of years from Braun et al. (2017), plausible
+  values are 1e-4 to 1e-2 yr\\^{-1}\\.
 
 ## Value
 

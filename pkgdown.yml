@@ -2,11 +2,12 @@ pandoc: 3.8.3
 pkgdown: 2.2.0
 pkgdown_sha: ~
 articles:
+  bacterial-correction: bacterial-correction.html
   depth-series: depth-series.html
   forward-model-basics: forward-model-basics.html
   kinetics-fitting: kinetics-fitting.html
   temperature-reconstruction: temperature-reconstruction.html
-last_built: 2026-06-24T17:57Z
+last_built: 2026-06-27T20:47Z
 urls:
   reference: https://nickmckay.github.io/AARP/reference
   article: https://nickmckay.github.io/AARP/articles
